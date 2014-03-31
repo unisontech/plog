@@ -181,7 +181,7 @@ combo(SampleName, {Size, TDelta}) when is_integer(Size), is_integer(TDelta) ->
     gen_server:cast(?MODULE,
         {submit_sample, combo, SampleName, {Size, TDelta}, ok}).
 
-combo_count(Category, SampleName, Count, TDelta) 
+combo_count(Category, SampleName, Count, TDelta)
                 when is_integer(Count) andalso is_integer(TDelta) ->
     case should_log(Category) of
       true -> combo_count(SampleName, {Count, TDelta});
@@ -226,13 +226,13 @@ extract(EntryFilter) when is_function(EntryFilter, 1) ->
         || {SlotName, {SampleName, WithinSlot, Result}, Mavg} = Entry
             <- ets:tab2list(tab()),
             EntryFilter(Entry)],
-    GroupedEntries = list_utils:group_by_key(1, lists:keysort(1, Entries)),
+    GroupedEntries = group_by_key(1, lists:keysort(1, Entries)),
     lists:sort(fun sort_by_group_activity/2,
         [add_total_value(sort_snd([],
             slot_name_as_group_header(Sublist)))
             || Sublist <- GroupedEntries]).
 
-extract_sample(Name) -> [  
+extract_sample(Name) -> [
         {SlotName, WithinSlot, Result, Mavg}
         ||
         {SlotName, {SampleName, WithinSlot, Result}, Mavg}
@@ -266,7 +266,7 @@ print(GroupedList) ->
 
 format(GroupedList) ->
     lists:flatten(lists:map(fun
-    ({ComboType, [{SampleName, _WithinSlot, _Result, _Mavg}|_] = List}) 
+    ({ComboType, [{SampleName, _WithinSlot, _Result, _Mavg}|_] = List})
                 when ComboType == combo orelse ComboType == combo_count ->
       {Epd, [{95, P95}, {98, P98}], Grid} = format_2d_grid([95, 98], List),
       AuxInfo = lists:flatten(io_lib:format("~bepm,~pms@95%,~pms@98%",
@@ -306,12 +306,12 @@ mavg_info_columns(Mavg) ->
          [integer_to_list(Period), "avg"]].
 
 format_1d_grid(PercentilePoints, List, SlotName) ->
-    Unit = case SlotName of 
-        delta -> ms; 
-        count -> number; 
-        size  -> bytes; 
-        value -> value; 
-        magnitude -> magnitude 
+    Unit = case SlotName of
+        delta -> ms;
+        count -> number;
+        size  -> bytes;
+        value -> value;
+        magnitude -> magnitude
     end,
     Header = [Unit, eps, epm],
     Body = [begin
@@ -407,7 +407,7 @@ handle_call(delete_all_objects, _From, State) ->
 
 handle_cast({submit_sample, SlotName, SampleName, Measurement, Result}, #state{tab=T} = State) ->
     Key = {SampleName, within(SlotName, Measurement), Result},
-    V = ma_val(SlotName, Measurement), 
+    V = ma_val(SlotName, Measurement),
     NewValue = case ets:lookup(T, Key) of
       [{SlotName, _, Mavg}] -> {SlotName, Key, jn_mavg:bump_mavg(Mavg, V)};
       [] ->  {SlotName, Key, jn_mavg:new_mavg(300, [{start_events, V}])}
@@ -487,7 +487,7 @@ format_grid(RawList, Options) ->
         ]],
     ColumnWidths = grid_compute_column_widths(List),
     FormatRow = fun(Row) ->
-        [string_utils:intersperse(ColumnSeparator,
+        [intersperse(ColumnSeparator,
         [grid_format_cell(Alignment, FirstColumnAlignment,
             FirstColumnLeftIndent, FirstColumnRightIndent,
             N, ColWidth, Value)
@@ -525,4 +525,24 @@ transpose([]) -> [];
 transpose([[]|XSS]) -> transpose(XSS);
 transpose([[X|XS]|XSS]) ->
     [[X|[H||[H|_]<-XSS]] | transpose([XS|[T||[_|T]<-XSS]])].
+
+% Group the list into a list of lists of equal, adjacent elements.
+%% group(List) -> group_by(List, [], fun(A, B) -> A =:= B end).
+group_by_key(N, List) -> group_by(List, [],
+    fun(A, B) -> element(N, A) =:= element(N, B) end).
+%% group_by(Pred, List) -> group_by(List, [], Pred).
+group_by([], [], _Pred) -> [];
+group_by([], Cur, _Pred) -> [lists:reverse(Cur)];
+group_by([H|Rest], [], Pred) -> group_by(Rest, [H], Pred);
+group_by([H|Rest], Cur, Pred) ->
+    case Pred(hd(Cur), H) of
+        true -> group_by(Rest, [H|Cur], Pred);
+        false -> [lists:reverse(Cur) | group_by(Rest, [H], Pred)]
+    end.
+
+% string:join(What, With) ?
+intersperse(With, What) -> lists:reverse(intersperse(What, With, [])).
+intersperse([A,B|T], With, Acc) -> intersperse([B|T], With, [With, A | Acc]);
+intersperse([A], _With, Acc) -> [A|Acc];
+intersperse([], _With, Acc) -> Acc.
 

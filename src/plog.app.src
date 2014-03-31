@@ -9,5 +9,6 @@
                  ]},
   {mod, { plog_app, []}},
   {env, [
+    {api,true}, {ejabber,true}
   ]}
  ]}.
