@@ -1,7 +1,7 @@
 {application, plog,
  [
   {description, "local stats"},
-  {vsn, "1.0.0"},
+  {vsn, "1.0.1"},
   {registered, [plog]},
   {applications, [
                   kernel,
