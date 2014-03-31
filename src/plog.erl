@@ -46,7 +46,7 @@
 -spec should_log(term()) -> boolean().
 should_log(Category) ->
     case application:get_env(plog, Category) of
-        true -> true;
+        {ok,true} -> true;
         _    -> false
     end.
 
